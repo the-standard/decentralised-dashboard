@@ -9,15 +9,40 @@ import {
 
 import {
   useCurrentPageStore,
+  usesUSDVaultListPageStore,
+  usesEURVaultListPageStore,
 } from "../../store/Store";
+
+import { formatNumber, formatCurrency } from '../ui/NumberUtils';
 
 import Card from "../ui/Card";
 import Pagination from "../ui/Pagination";
 import CenterLoader from "../ui/CenterLoader";
 import Typography from "../ui/Typography";
 
-const VaultList = ({ vaults, vaultsLoading, tokenId }) => {
-  const { setCurrentPage, currentPage } = useCurrentPageStore();
+import seurologo from "../../assets/EUROs.svg";
+import susdlogo from "../../assets/USDs.svg";
+
+const VaultList = ({ vaults, vaultsLoading, listType }) => {
+
+  const { setCurrentsUSDPage, currentsUSDPage } = usesUSDVaultListPageStore();
+  const { setCurrentsEURPage, currentsEURPage } = usesEURVaultListPageStore();
+
+  let setCurrentPage;
+  let currentPage;
+  let currencySymbol = '';
+
+  if (listType === 'USDs') {
+    setCurrentPage = setCurrentsUSDPage;
+    currentPage = currentsUSDPage;
+    currencySymbol = '$';
+  } else {
+    setCurrentPage = setCurrentsEURPage;
+    currentPage = currentsEURPage;
+    currencySymbol = '€';
+  }
+
+  const navigate = useNavigate();
 
   const sortedVaults = [...vaults].sort((a, b) => {
     const idA = BigInt(a.tokenId);
@@ -66,14 +91,14 @@ const VaultList = ({ vaults, vaultsLoading, tokenId }) => {
 
   return (
     <>
-      <Card className="card-compact">
+      <Card className="card-compact mb-4">
         <div className="card-body">
           <Typography variant="h2" className="card-title">
-            Vault List
+            {listType} Vaults
           </Typography>
 
           <div className="overflow-x-auto">
-            <table className="table table-zebra">
+            <table className="table">
               <thead>
                 <tr>
                   <th className="hidden md:table-cell">Type</th>
@@ -85,7 +110,7 @@ const VaultList = ({ vaults, vaultsLoading, tokenId }) => {
               </thead>
               {vaultsLoading ? (null) : (
                 <tbody>
-                  {sortedVaults
+                  {sortedVaults?.length && sortedVaults
                     .slice(
                       (currentPage - 1) * itemsPerPage,
                       currentPage * itemsPerPage
@@ -102,10 +127,44 @@ const VaultList = ({ vaults, vaultsLoading, tokenId }) => {
                       }
                     })
                     .map(function(vault, index) {
-                      const vaultHealth = computeProgressBar(
-                        vault.status.minted,
-                        vault.status.totalCollateralValue
-                      );
+                      if (!vault || !vault.status) {
+                        return(
+                          <tr
+                            key={index}
+                            className="active animate-pulse"
+                          >
+                            <td className="hidden md:table-cell">
+                              <div className="rounded-full bg-base-content h-[42px] w-[42px] opacity-30"></div>
+                            </td>
+                            <td>
+                              <div className="rounded-lg bg-base-content h-[12px] w-[38px] opacity-30"></div>
+                            </td>
+                            <td className="hidden md:table-cell">
+                              <div className="rounded-lg bg-base-content h-[12px] w-[72px] opacity-30"></div>
+                            </td>
+                            <td>
+                              <div className="rounded-lg bg-base-content h-[12px] w-[92px] opacity-30"></div>
+                            </td>
+                            <td className="hidden md:table-cell">
+                              <div className="rounded-lg bg-base-content h-[12px] w-[120px] opacity-30"></div>
+                            </td>
+                            <td className="text-right">
+                              <div className="rounded-lg bg-base-content h-[38px] w-[64px] opacity-30"></div>
+                            </td>
+                          </tr> 
+                        )
+                      }
+                      let vaultType = '';
+                      if (vault?.status?.vaultType) {
+                        vaultType = ethers.decodeBytes32String(vault?.status?.vaultType);
+                      }
+                      let vaultHealth = 100;
+                      if (vault?.status) {
+                        vaultHealth = computeProgressBar(
+                          vault?.status?.minted,
+                          vault?.status?.totalCollateralValue
+                        );
+                      }
                       let healthColour = 'success';
                       if (vaultHealth >= 30) {
                         healthColour = 'neutral';
@@ -116,36 +175,76 @@ const VaultList = ({ vaults, vaultsLoading, tokenId }) => {
                       if (vaultHealth >= 75) {
                         healthColour = 'error';
                       }
+
                       return(
-                        <tr key={index}>
+                        <tr
+                          key={index}
+                          className="cursor-pointer hover"
+                          onClick={() => navigate(
+                            `/vault/${vaultType.toString()}/${
+                              BigInt(
+                                vault.tokenId
+                              ).toString()
+                            }`
+                          )}
+                        >
                           <td className="hidden md:table-cell">
-                            EUROs
+                            <Tooltip
+                              className="h-full"
+                              position="top"
+                              message={(vaultType || '' )}
+                            >
+                              {vaultType === 'EUROs' ? (
+                                <img
+                                  style={{
+                                    display: "block",
+                                    width: "42px",
+                                  }}
+                                  src={seurologo}
+                                  alt="EUROs"
+                                />
+                              ) : null}
+                              {vaultType === 'USDs' ? (
+                                <img
+                                  style={{
+                                    display: "block",
+                                    width: "42px",
+                                  }}
+                                  src={susdlogo}
+                                  alt="USDs"
+                                />
+                              ) : null}
+                            </Tooltip>
                           </td>
                           <td>
-                            {vault.status.version ? (
-                              `V${vault.status.version}-`
+                            {vault?.status?.version ? (
+                              `V${vault?.status?.version}-`
                             ) : ('')}
-                            {BigInt(vault.tokenId).toString()}
+                            {BigInt(vault?.tokenId).toString()}
                           </td>
                           <td className="hidden md:table-cell">
-                            €
-                            {truncateToTwoDecimals(
+                            {formatCurrency(
+                              currencySymbol,
                               ethers.formatEther(
                                 BigInt(
                                   vault.status.totalCollateralValue
                                 ).toString()
-                              )
+                              ),
+                              2
                             )}
                           </td>
                           <td>
-                            {truncateToTwoDecimals(
-                              ethers.formatEther(vault.status.minted.toString())
+                            {formatNumber(
+                              truncateToTwoDecimals(
+                                ethers.formatEther(vault.status.minted.toString())
+                              )
                             )}
-                            &nbsp;EUROs
+                            &nbsp;
+                            {vaultType.toString()}
                           </td>
                           <td className="hidden md:table-cell">
                             {vault.status.liquidated ? (
-                              <Typography variant="p">
+                              <Typography variant="p" className="text-error">
                                 Vault Liquidated
                               </Typography>
                             ) : (
@@ -162,14 +261,21 @@ const VaultList = ({ vaults, vaultsLoading, tokenId }) => {
                               </Tooltip>
                             )}
                           </td>
-                          <td>
+                          <td className="text-right">
                             <Link
-                              className="btn btn-outline btn-sm"
-                              to={`/vault/${
-                                BigInt(
-                                  vault.tokenId
-                                ).toString()
-                              }`}
+                              className="btn btn-outline"
+                              disabled={!vault.tokenId}
+                              to={
+                                vault?.tokenId ? (
+                                  `/vault/${
+                                    BigInt(
+                                      vault?.tokenId
+                                    ).toString()
+                                  }`
+                                ) : (
+                                  `/`
+                                )
+                              }
                             >
                               Manage
                             </Link>
@@ -187,12 +293,16 @@ const VaultList = ({ vaults, vaultsLoading, tokenId }) => {
           </div>
 
           <div className="card-actions pt-4 justify-between items-center">
-            <Pagination
-              totalItems={sortedVaults.length || 0}
-              perPage={itemsPerPage || 0}
-              currentPage={currentPage}
-              onPageChange={handlePageChange}
-            />
+            {sortedVaults && sortedVaults.length ? (
+              <Pagination
+                totalItems={sortedVaults.length || 0}
+                perPage={itemsPerPage || 0}
+                currentPage={currentPage}
+                onPageChange={handlePageChange}
+              />            
+            ) : (
+              <div>&nbsp;</div>
+            )}
           </div>
         </div>
       </Card>

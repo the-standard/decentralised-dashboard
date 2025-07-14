@@ -1,31 +1,63 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Menu,
+  Tooltip,
 } from 'react-daisyui';
 import {
   CircleStackIcon,
+  BanknotesIcon,
   XMarkIcon,
-  Square3Stack3DIcon
+  Square3Stack3DIcon,
+  ArrowPathRoundedSquareIcon,
+  ArchiveBoxIcon,
+  BoltIcon,
+  ScaleIcon,
+  PuzzlePieceIcon,
+  QueueListIcon,
+  RectangleStackIcon,
 } from '@heroicons/react/24/outline';
 
+import {
+  useLocalThemeModeStore,
+  useGuestShowcaseStore,
+} from "../../store/Store";
+
+import StandardioLogoWhite from "../../assets/standardiologo-white.svg";
+import StandardioLogoBlack from "../../assets/standardiologo-black.svg";
+
 import Button from "./Button";
-import ThemeToggle from "./ThemeToggle";
+import ThemeButton from "./ThemeButton";
 
 const SideNav = (props) => {
   const { toggleVisible } = props;
   const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    useShowcase,
+  } = useGuestShowcaseStore();
+  const { localThemeModeStore } = useLocalThemeModeStore();
+  
+
+  const isLight = localThemeModeStore && localThemeModeStore.includes('light');
 
   return (
-    <Menu className="p-0 w-60 h-full text-base-content bg-base-100 shadow-[inset_0_4px_6px_-1px_rgba(0,0,0,0.1)]">
-      <div className="flex flex-row flex-no-wrap space-x-2 md:hidden p-2 h-16 bg-base-100">
-        <Button className="flex grow text-xl p-2 px-4" color="ghost" style={{justifyContent: "flex-start"}}>
+    <Menu className="p-0 text-base-content bg-base-100 h-full">
+      <div className="flex flex-row flex-no-wrap space-x-2 min-[1220px]:hidden p-2 h-16">
+        <Button
+          className="flex grow text-xl p-2 px-4"
+          color="ghost"
+          style={{justifyContent: "flex-start"}}
+          onClick={() => navigate("/")}
+        >
           {import.meta.env.VITE_COMPANY_DAPP_NAME || ''}
         </Button>
         <Button color="ghost" onClick={toggleVisible}>
           <XMarkIcon className="h-6 w-6 inline-block"/>
         </Button>
       </div>
-      <div className="p-2">
+      {/* Small - */}
+      {/* <div className="p-2 flex flex-col gap-2 w-full md:hidden"> */}
+      <div className="p-2 flex flex-col gap-2 w-full min-[1220px]:hidden">
         <Menu.Item>
           <NavLink
             to="/vaults"
@@ -36,21 +68,59 @@ const SideNav = (props) => {
               'navbar-item active' : 'navbar-item'
             }
           >
-            <CircleStackIcon className="h-6 w-6 inline-block"/>
-            Vaults
+            <RectangleStackIcon className="h-6 w-6 inline-block"/>
+            {/* <span className="md:hidden"> */}
+            <span className="min-[1220px]:hidden">
+              Vaults
+            </span>
           </NavLink>
         </Menu.Item>
         <Menu.Item>
           <NavLink
             to="/staking-pool"
+            className={({ isActive }) => 
+              isActive ||
+              location.pathname.includes('/staking-pool') ?
+              'navbar-item active' : 'navbar-item'
+            }
           >
             <Square3Stack3DIcon className="h-6 w-6 inline-block"/>
             Staking Pool
           </NavLink>
         </Menu.Item>
-      </div>
-      <div className="block md:hidden self-center mt-auto pb-4">
-        <ThemeToggle />
+        <Menu.Item>
+          <NavLink
+            to="/dex"
+            className={({ isActive }) => 
+              isActive ||
+              location.pathname.includes('/dex') ?
+              'navbar-item active' : 'navbar-item'
+            }
+          >
+            <ArrowPathRoundedSquareIcon className="h-6 w-6 inline-block"/>
+            Cross-Chain Dex
+          </NavLink>
+        </Menu.Item>
+        <Menu.Item>
+          <NavLink
+            to="/redemptions"
+            className={({ isActive }) => 
+              isActive ||
+              location.pathname.includes('/redemptions') ?
+              'navbar-item active' : 'navbar-item'
+            }
+          >
+            <ScaleIcon className="h-6 w-6 inline-block"/>
+            {/* <span className="md:hidden"> */}
+            <span className="min-[1220px]:hidden">
+              Auto Redemptions
+            </span>
+          </NavLink>
+        </Menu.Item>
+
+        <div className="block md:hidden self-center mt-auto pb-4">
+          <ThemeButton />
+        </div>
       </div>
     </Menu>
   );

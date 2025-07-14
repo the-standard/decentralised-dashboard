@@ -15,6 +15,7 @@ import {
   useSmartVaultABIStore,
 } from "../../store/Store";
 
+import TokenNormalise from "../ui/TokenNormalise";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Typography from "../ui/Typography";
@@ -29,7 +30,7 @@ const WithdrawModal = (props) => {
     collateralValue,
   } = props;
 
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState(0n);
 
   const { vaultAddress } = useVaultAddressStore();
   const { smartVaultABI } = useSmartVaultABIStore();
@@ -82,9 +83,13 @@ const WithdrawModal = (props) => {
       if (error && error.shortMessage) {
         errorMessage = error.shortMessage;
       }
-      toast.error(errorMessage || 'There was an error2');
+      toast.error(errorMessage || 'There was an error');
     }
   };
+
+  const formatPrevTotal = collateralValue;
+  const formatAmount = ethers.formatUnits(amount);
+  const formatNewTotal = ethers.formatUnits(ethers.parseUnits(formatPrevTotal, decimals) - amount);
 
   useEffect(() => {
     if (isPending) {
@@ -94,9 +99,25 @@ const WithdrawModal = (props) => {
       inputRef.current.focus();
       setTxdata(txRcptData);
       toast.success("Withdraw Successful");
+      setAmount(0n);
+      closeModal();
+      try {
+        plausible('CollateralWithdraw', {
+          props: {
+            CollateralWithdrawToken: symbol,
+            CollateralWithdrawAmount: formatAmount,
+            CollateralWithdrawPreviousTotal: formatPrevTotal,
+            CollateralWithdrawNewTotal: formatNewTotal,
+          }
+        });
+      } catch (error) {
+        console.log(error);
+      }
     } else if (isError) {
       inputRef.current.value = "";
       inputRef.current.focus();
+      toast.error('There was an error');
+      setAmount(0n);
     }
   }, [
     isPending,
@@ -133,7 +154,7 @@ const WithdrawModal = (props) => {
         <>
           <Typography variant="h2" className="card-title">
             <ArrowDownCircleIcon className="mr-2 h-6 w-6 inline-block"/>
-            Withdraw {symbol}
+            Withdraw {TokenNormalise(symbol)}
           </Typography>
 
           <div className="flex justify-between">
@@ -162,6 +183,7 @@ const WithdrawModal = (props) => {
             />
             <Button
               className="join-item"
+              variant="outline"
               onClick={handleMaxBalance}
               disabled={isPending}
             >
@@ -170,7 +192,7 @@ const WithdrawModal = (props) => {
 
           </div>
           <div>
-            {symbol} to address "{shortenedAddress}"
+            {TokenNormalise(symbol)} to address "{shortenedAddress}"
           </div>
 
           <div className="card-actions pt-4 flex-col-reverse lg:flex-row justify-end">

@@ -4,7 +4,12 @@ import {
   ArrowUpCircleIcon,
 } from '@heroicons/react/24/outline';
 
+import {
+  useWideBorrowModal,
+} from "../../store/Store";
+
 import VaultHealth from "./VaultHealth";
+import EurosCompare from "./EurosCompare";
 
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
@@ -29,7 +34,10 @@ const RepayModal = (props) => {
     toPercentage,
     inputRef,
     currentVault,
+    vaultType,
   } = props;
+
+  const { borrowWide } = useWideBorrowModal();
 
   if (isSuccess) {
     return (
@@ -40,18 +48,19 @@ const RepayModal = (props) => {
         >
           <Typography variant="h2" className="card-title">
             <ArrowUpCircleIcon className="mr-2 h-6 w-6 inline-block"/>
-            Repaying EUROs
+            Repaying {vaultType}
           </Typography>
 
           <Typography
             variant="h3"
           >
-            You just repayed {amount} EUROs successfully!
+            You just repayed {amount} {vaultType} successfully!
           </Typography>
 
           <div className="card-actions pt-4 flex-col-reverse lg:flex-row justify-end">
             <Button
               className="w-full lg:w-64"
+              color="ghost"
               onClick={closeModal}
             >
               Close
@@ -70,7 +79,7 @@ const RepayModal = (props) => {
           closeModal={closeModal}
         >
           <Typography variant="h2" className="card-title">
-            Confirm Your EUROs Spending cap
+            Confirm Your {vaultType} Spending cap
           </Typography>
   
           <Typography
@@ -156,90 +165,99 @@ const RepayModal = (props) => {
       <Modal
         open={open}
         closeModal={closeModal}
+        wide={borrowWide}
       >
-        <Typography variant="h2" className="card-title">
-          <ArrowUpCircleIcon className="mr-2 h-6 w-6 inline-block"/>
-          Repaying EUROs
-        </Typography>
+        <div className="flex flex-col md:flex-row">
+          <div className="flex flex-col flex-1">
+            <Typography variant="h2" className="card-title">
+              <ArrowUpCircleIcon className="mr-2 h-6 w-6 inline-block"/>
+              Repaying {vaultType}
+            </Typography>
 
-        <div className="flex justify-between">
-          <Typography
-            variant="p"
-          >
-            Repay Amount
-          </Typography>
-          <Typography
-            variant="p"
-            className="text-right"
-          >
-            Remaining: {getInputMax()}
-          </Typography>
-        </div>
-        <div
-          className="join"
-        >
-          <Input
-            className="join-item w-full"
-            placeholder="Amount of EUROs you want to repay"
-            type="number"
-            onChange={(e) => handleAmount(e, 'REPAY')}
-            disabled={isPending}
-            useRef={inputRef}
-          />
-
-          <Button
-            className="join-item"
-            onClick={() => handleInputMax('REPAY')}
-            disabled={isPending}
-          >
-            Max
-          </Button>
-        </div>
-
-        <div className="mt-4">
-          <VaultHealth currentVault={currentVault}/>
-        </div>
-
-        <div>
-          {repayValues.map((item) => (
-            <div
-              className="flex justify-between align-center"
-              key={item.key}
-            >
+            <div className="flex justify-between">
               <Typography
                 variant="p"
-                className="flex-1"
               >
-                {item.key}
+                Repay Amount
               </Typography>
               <Typography
                 variant="p"
-                className="flex-1"
+                className="text-right"
               >
-                {item.value || '0'}
+                Remaining: {getInputMax()}
               </Typography>
             </div>
-          ))}
-        </div>
+            <div
+              className="join"
+            >
+              <Input
+                className="join-item w-full"
+                placeholder={`Amount of ${vaultType} you want to repay`}
+                type="number"
+                onChange={(e) => handleAmount(e, 'REPAY')}
+                disabled={isPending}
+                useRef={inputRef}
+              />
 
-        <div className="card-actions pt-4 flex-col-reverse lg:flex-row justify-end">
-          <Button
-            className="w-full lg:w-auto"
-            color="ghost"
-            onClick={closeModal}
-            disabled={isPending}
-          >
-            Close
-          </Button>
-          <Button
-            className="w-full lg:w-64"
-            color="success"
-            disabled={!amount || isPending}
-            onClick={() => handleDebtAction('REPAY')}
-            loading={isPending}
-          >
-            Repay
-          </Button>
+              <Button
+                className="join-item"
+                variant="outline"
+                onClick={() => handleInputMax('REPAY')}
+                disabled={isPending}
+              >
+                Max
+              </Button>
+            </div>
+
+            <div className="mt-4">
+              <VaultHealth currentVault={currentVault}/>
+            </div>
+
+            <div>
+              {repayValues.map((item) => (
+                <div
+                  className="flex justify-between align-center"
+                  key={item.key}
+                >
+                  <Typography
+                    variant="p"
+                    className="flex-1"
+                  >
+                    {item.key}
+                  </Typography>
+                  <Typography
+                    variant="p"
+                    className="flex-1"
+                  >
+                    {item.value || '0'}
+                  </Typography>
+                </div>
+              ))}
+            </div>
+
+            <div className="card-actions pt-4 flex-col-reverse lg:flex-row justify-end">
+              <Button
+                className="w-full lg:w-auto"
+                color="ghost"
+                onClick={closeModal}
+                disabled={isPending}
+              >
+                Close
+              </Button>
+              <Button
+                className="w-full lg:w-64"
+                color="success"
+                disabled={!amount || isPending}
+                onClick={() => handleDebtAction('REPAY')}
+                loading={isPending}
+              >
+                Repay
+              </Button>
+            </div>
+          </div>
+          {vaultType === 'EUROs' ? (
+            <EurosCompare vaultType={vaultType}/>
+          ) : null}
         </div>
       </Modal>
     </>

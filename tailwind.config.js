@@ -6,15 +6,31 @@ export default {
     "node_modules/daisyui/dist/**/*.js",
     "node_modules/react-daisyui/dist/**/*.js",
   ],
-  theme: {
-    extend: {},
-  },
   plugins: [
     require("daisyui"),
     require('@tailwindcss/typography')
   ],
-  daisyUI: {
-    themes: ["light", "dark"],
+  theme: {
+    extend: {
+      colors: {},
+    },
+  },
+  daisyui: {
+    themes: [
+      {
+        'simple-light': {
+          ...require("daisyui/src/theming/themes")["light"],
+          'primary' : '#5617de',
+          'base-content' : 'rgba(0,0,0,0.8)',
+        },
+      },
+      {
+        'simple-dark': {
+          ...require("daisyui/src/theming/themes")["dark"],
+          'primary' : '#5617de',
+          'base-content' : 'rgba(255,255,255,0.8)',
+        },
+      },
+    ],
   },
 }
-
