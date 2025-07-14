@@ -19,6 +19,8 @@ import {
   useStakingPoolv2AddressStore,
 } from "../../store/Store.jsx";
 
+import { useInactivityControl } from '../InactivityControl';
+
 import Card from "../ui/Card";
 import Typography from "../ui/Typography";
 import Button from "../ui/Button";
@@ -45,6 +47,7 @@ const StakingIncrease = () => {
   const [eurosStakeAmount, setEurosStakeAmount] = useState(0);
   const [stage, setStage] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
+  const { isActive } = useInactivityControl();
 
   const tstInputRef = useRef(null);
   const eurosInputRef = useRef(null);
@@ -75,6 +78,7 @@ const StakingIncrease = () => {
       functionName: "balanceOf",
       args: [address]
     }],
+    enabled: isActive,
   });
 
   const eurosContract = {
@@ -92,9 +96,11 @@ const StakingIncrease = () => {
       functionName: "balanceOf",
       args: [address]
     }],
+    enabled: isActive,
   });
 
   useWatchBlockNumber({
+    enabled: isActive,
     onBlockNumber() {
       refetchTst();
       refetchEuros();
@@ -288,6 +294,7 @@ const StakingIncrease = () => {
               />
               <Button
                 className="join-item"
+                variant="outline"
                 onClick={() => handleTstInputMax()}
               >
                 Max
@@ -308,6 +315,7 @@ const StakingIncrease = () => {
               />
               <Button
                 className="join-item"
+                variant="outline"
                 onClick={() => handleEurosInputMax()}
               >
                 Max
@@ -315,6 +323,7 @@ const StakingIncrease = () => {
             </div>
             <div className="card-actions flex flex-row justify-end">
               <Button
+                color="primary"
                 loading={isPending}
                 disabled={isPending || tstStakeAmount <= 0 && eurosStakeAmount <= 0}
                 onClick={handleLetsStake}

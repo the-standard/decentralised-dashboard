@@ -17,9 +17,13 @@ import {
 import {
   useVaultAddressStore,
   usesEuroAddressStore,
+  usesUSDAddressStore,
   useErc20AbiStore,
   useVaultHealthUpdate,
+  useGuestShowcaseStore,
 } from "../../store/Store";
+
+import { useInactivityControl } from '../InactivityControl';
 
 import smartVaultAbi from "../../abis/smartVault";
 
@@ -30,17 +34,32 @@ import Button from "../ui/Button";
 
 const Debt = ({
   currentVault,
+  vaultType
 }) => {
   const { address } = useAccount();
+  const {
+    useShowcase,
+  } = useGuestShowcaseStore();
+
   const { vaultAddress } = useVaultAddressStore();
-  const { arbitrumsEuroAddress, arbitrumSepoliasEuroAddress } =
-    usesEuroAddressStore();
+  const {
+    arbitrumsEuroAddress,
+    arbitrumSepoliasEuroAddress
+  } = usesEuroAddressStore();
+
+  const {
+    arbitrumsUSDAddress,
+    arbitrumSepoliasUSDAddress
+  } = usesUSDAddressStore();
+    
   const { erc20Abi } = useErc20AbiStore();
   const {
     setVaultHealthUpdateType,
     setVaultHealthUpdateAmount,
   } = useVaultHealthUpdate();
   const inputRef = useRef(null);
+
+  const { isActive } = useInactivityControl();
 
   const [ amount, setAmount ] = useState(BigInt(0));
   const [ stage, setStage ] = useState('');
@@ -51,32 +70,47 @@ const Debt = ({
   const eurosAddress = chainId === arbitrumSepolia.id ?
     arbitrumSepoliasEuroAddress :
     arbitrumsEuroAddress;
-  
-  const eurosContract = {
-    address: eurosAddress,
+
+  const usdsAddress = chainId === arbitrumSepolia.id ?
+    arbitrumSepoliasUSDAddress :
+    arbitrumsUSDAddress;
+
+  let sAddress;
+  if (vaultType === 'EUROs') {
+    sAddress = eurosAddress;
+  }
+  if (vaultType === 'USDs') {
+    sAddress = usdsAddress;
+  }
+  const borrowEnabled = vaultType != 'EUROs';
+
+  const sContract = {
+    address: sAddress,
     abi: erc20Abi,
   }
     
-  const { data: eurosData, refetch } = useReadContracts({
+  const { data: sData, refetch } = useReadContracts({
     contracts: [{
-      ... eurosContract,
+      ... sContract,
       functionName: "allowance",
-      args: [address, vaultAddress]
+      args: [address, vaultAddress],
     },{
-      ... eurosContract,
+      ... sContract,
       functionName: "balanceOf",
-      args: [address]
+      args: [address],
     }],
+    enabled: isActive,
   });
 
   useWatchBlockNumber({
+    enabled: isActive,
     onBlockNumber() {
       refetch();
     },
   })
 
-  const allowance = eurosData && eurosData[0].result;
-  const eurosWalletBalance = eurosData && eurosData[1].result;
+  const allowance = sData && sData[0].result;
+  const sWalletBalance = sData && sData[1].result;
 
   const handleAmount = (e, type) => {
     setVaultHealthUpdateType(type);
@@ -90,8 +124,8 @@ const Debt = ({
   const getInputMax = () => {
     const minted = currentVault?.status?.minted;
     const burnFeeRate = currentVault?.burnFeeRate;
-    const maxRepayWei = eurosWalletBalance < (minted + calculateRateAmount(minted, burnFeeRate)) ?
-      eurosWalletBalance * HUNDRED_PC / (HUNDRED_PC + burnFeeRate) :
+    const maxRepayWei = sWalletBalance < (minted + calculateRateAmount(minted, burnFeeRate)) ?
+      sWalletBalance * HUNDRED_PC / (HUNDRED_PC + burnFeeRate) :
       minted;
     const maxRepay = ethers.formatEther(maxRepayWei);
     return maxRepay;
@@ -161,7 +195,7 @@ const Debt = ({
     try {
       writeContract({
         abi: erc20Abi,
-        address: eurosAddress,
+        address: sAddress,
         functionName: "approve",
         args: [vaultAddress, repayFee],
       });
@@ -208,11 +242,65 @@ const Debt = ({
     }
   };
 
+  const handleBorrowSuccessReport = () => {
+    const minted = currentVault?.status?.minted;
+    let formatPrevTotal;
+    if (minted) {
+      formatPrevTotal = ethers.formatEther(minted);
+    }
+    let formatAmount = ethers.formatEther(amount);
+    let formatNewTotal;
+    if (amount && minted) {
+      formatNewTotal = ethers.formatEther(ethers.parseEther(formatPrevTotal) + amount);
+    }
+
+    try {
+      plausible('DebtIssue', {
+        props: {
+          BorrowToken: vaultType,
+          BorrowAmount: formatAmount,
+          BorrowPreviousDebt: formatPrevTotal,
+          BorrowNewDebt: formatNewTotal,
+        }
+      });  
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const handleRepaySuccessReport = () => {
+    const minted = currentVault?.status?.minted;
+    let formatPrevTotal;
+    if (minted) {
+      formatPrevTotal = ethers.formatEther(minted);
+    }
+    let formatAmount = ethers.formatEther(amount);
+    let formatNewTotal;
+    if (amount && minted) {
+      formatNewTotal = ethers.formatEther(ethers.parseEther(formatPrevTotal) - amount);
+    }
+
+    // TODO add plausible logic for USDs vaults
+    try {
+      plausible('DebtRepay', {
+        props: {
+          RepayToken: vaultType,
+          RepayAmount: formatAmount,
+          RepayPreviousDebt: formatPrevTotal,
+          RepayNewDebt: formatNewTotal,
+        }
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   useEffect(() => {
     if (stage === 'MINT') {
       if (isPending) {
         setBorrowSuccess(false);
       } else if (isSuccess) {
+        handleBorrowSuccessReport();
         setBorrowSuccess(true);
         toast.success("Borrowed Successfully");
         setStage('');
@@ -238,6 +326,7 @@ const Debt = ({
         setRepaySuccess(false)
         setRepayStep(2);
       } else if (isSuccess) {
+        handleRepaySuccessReport();
         setRepaySuccess(true);
         toast.success("Repayed Successfully");
         setRepayStep(1);
@@ -273,8 +362,8 @@ const Debt = ({
     } else {
       if (amount > currentVault?.status.minted) {
         alert('Repayment amount exceeds debt in vault');
-      } else if (eurosWalletBalance < calculateRepaymentWithFee()) {
-        alert('Repayment amount exceeds your EUROs balance');
+      } else if (sWalletBalance < calculateRepaymentWithFee()) {
+        alert('Repayment amount exceeds your balance');
       } else {
         handleApprovePayment();
       }
@@ -332,16 +421,20 @@ const Debt = ({
 
   return (
     <>
-      <div className="card-actions pt-4 gap-4 xl:gap-8 flex-col-reverse lg:flex-row justify-between xl:justify-normal">
+      <div className="card-actions">
         <Button
-          className="w-full lg:w-64"
+          className="w-full lg:w-auto flex-1"
+          color="primary"
+          disabled={useShowcase || !borrowEnabled}
           onClick={() => setBorrowOpen(!borrowOpen)}
         >
           <ArrowDownCircleIcon className="h-6 w-6 inline-block"/>
           Borrow
         </Button>
         <Button
-          className="w-full lg:w-64"
+          className="w-full lg:w-auto flex-1"
+          color="primary"
+          disabled={useShowcase}
           onClick={() => setRepayOpen(!repayOpen)}
         >
           <ArrowUpCircleIcon className="h-6 w-6 inline-block"/>
@@ -360,6 +453,7 @@ const Debt = ({
         borrowValues={borrowValues}
         inputRef={inputRef}
         currentVault={currentVault}
+        vaultType={vaultType}
       />
 
       <RepayModal
@@ -379,6 +473,7 @@ const Debt = ({
         toPercentage={toPercentage}
         inputRef={inputRef}
         currentVault={currentVault}
+        vaultType={vaultType}
       />
     </>
   );

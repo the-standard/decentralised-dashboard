@@ -19,9 +19,10 @@ import QRCode from "react-qr-code";
 import {
   useVaultAddressStore,
   useErc20AbiStore,
+  useCurrentWagmiConfig
 } from "../../store/Store";
 
-import wagmiConfig from "../../WagmiConfig";
+import TokenNormalise from "../ui/TokenNormalise";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Typography from "../ui/Typography";
@@ -34,10 +35,15 @@ const DepositModal = (props) => {
     symbol,
     tokenAddress,
     decimals,
+    collateralValue
   } = props;
+  const [ethPending, setEthPending] = useState(false);
+  const [ethSuccess, setEthSuccess] = useState(false);
 
-  const [amount, setAmount] = useState(0);
-  const [maxBal, setMaxBal] = useState(0);
+  const { wagmiConfig } = useCurrentWagmiConfig();
+
+  const [amount, setAmount] = useState(0n);
+  const [maxBal, setMaxBal] = useState(0n);
   const [showQr, setShowQr] = useState(false);
 
   const { vaultAddress } = useVaultAddressStore();
@@ -54,12 +60,32 @@ const DepositModal = (props) => {
     balanceReqData.token = tokenAddress;
   }
   const { data: balanceData, refetch } = useBalance(balanceReqData);
-
+  
   useWatchBlockNumber({
     onBlockNumber() {
       refetch();
     },
   })
+
+  const handleDepositSuccess = () => {
+    const formatPrevTotal = collateralValue;
+    const formatAmount = ethers.formatUnits(amount);
+    const formatNewTotal = ethers.formatUnits(ethers.parseUnits(formatPrevTotal, decimals) + amount);
+  
+    toast.success("Deposit Successful");
+    try {
+      plausible('CollateralDeposit', {
+        props: {
+          CollateralDepositToken: symbol,
+          CollateralDepositAmount: formatAmount,
+          CollateralDepositPreviousTotal: formatPrevTotal,
+          CollateralDepositNewTotal: formatNewTotal,
+        }
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  }
 
   const walletBalance = balanceData?.value;
 
@@ -107,6 +133,8 @@ const DepositModal = (props) => {
 
   const depositEther = async () => {
     try {
+      setEthSuccess(false);
+      setEthPending(true);
       const txAmount = amount;
       const toAddress = vaultAddress;
       const hash = await sendTransaction(wagmiConfig, {
@@ -117,13 +145,22 @@ const DepositModal = (props) => {
       setTxdata(hash);
       inputRef.current.value = "";
       inputRef.current.focus();
+      setAmount(0n);
+      setEthPending(false);
+      setEthSuccess(true);
+      handleDepositSuccess();
     } catch (error) {
+      setEthPending(false);
+      setEthSuccess(false);
       console.log(error);
       let errorMessage;
       if (error && error.shortMessage) {
         errorMessage = error.shortMessage;
       }
       toast.error(errorMessage || 'There was a problem');
+      inputRef.current.value = "";
+      inputRef.current.focus();
+      setAmount(0n);
     }
   };
 
@@ -146,6 +183,7 @@ const DepositModal = (props) => {
         toast.error(errorMessage || 'There was a problem');  
         inputRef.current.value = "";
         inputRef.current.focus();
+        setAmount(0n);
       }
     }
   };
@@ -162,11 +200,13 @@ const DepositModal = (props) => {
     } else if (isSuccess) {
       inputRef.current.value = "";
       inputRef.current.focus();
-      toast.success("Deposit Successful");
+      handleDepositSuccess();
       setTxdata(txRcptData);
+      setAmount(0n);
     } else if (isError) {
       inputRef.current.value = "";
       inputRef.current.focus();
+      setAmount(0n);
     }
   }, [
     isPending,
@@ -199,12 +239,14 @@ const DepositModal = (props) => {
       >
         <Typography variant="h2" className="card-title">
           <ArrowUpCircleIcon className="mr-2 h-6 w-6 inline-block"/>
-          Deposit {symbol}
+          Deposit {TokenNormalise(symbol)}
         </Typography>
 
-        <div role="alert" className="alert alert-warning mb-2">
+        <div role="alert" className="alert alert-warning bg-yellow-400/20 mb-2">
           <span>
-            <b>Only send coins on Arbitrum</b>. Deposits from other chains will be lost.
+            <b>Only send coins on Arbitrum</b>.
+            <br/>
+            Deposits from other chains will be lost.
           </span>
         </div>
 
@@ -267,6 +309,7 @@ const DepositModal = (props) => {
             {symbol !== "ETH" && symbol !== "AGOR" && (
               <Button
                 className="join-item"
+                variant="outline"
                 onClick={handleMaxBalance}
                 disabled={isPending}
               >
@@ -288,16 +331,16 @@ const DepositModal = (props) => {
             className="w-full lg:w-auto"
             color="ghost"
             onClick={closeModal}
-            disabled={isPending}
+            disabled={isPending || ethPending}
           >
             Close
           </Button>
           <Button
             className="w-full lg:w-64"
             color="success"
-            disabled={!amount || isPending}
+            disabled={!amount || isPending || ethPending}
             onClick={depositViaMetamask}
-            loading={isPending}
+            loading={isPending || ethPending}
           >
             Confirm
           </Button>
